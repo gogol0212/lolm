@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>上单克制查询 - Gabriel Pro Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white min-h-screen p-6">
+    <div class="max-w-2xl mx-auto">
+        <h1 class="text-3xl font-bold mb-8 text-center text-blue-400">英雄联盟手游上单克制查询</h1>
+        
+        <!-- 搜索框 -->
+        <div class="relative mb-8">
+            <input type="text" id="searchInput" onkeyup="searchHero()" 
+                placeholder="输入英雄全名或外号（如：铁男、剑姬、黑哥）..." 
+                class="w-full p-4 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <!-- 结果展示 -->
+        <div id="result" class="hidden space-y-6">
+            <!-- 英雄名称展示 -->
+            <div class="text-center pb-2 border-b border-gray-700">
+                <h2 id="heroNameTitle" class="text-2xl font-bold text-yellow-400"></h2>
+            </div>
+
+            <div class="bg-gray-800 p-6 rounded-xl shadow-lg border-l-4 border-red-500">
+                <h2 class="text-xl font-semibold mb-3 text-red-400">🚨 谁克制他/她？</h2>
+                <p id="counteredBy" class="text-gray-300"></p>
+            </div>
+
+            <div class="bg-gray-800 p-6 rounded-xl shadow-lg border-l-4 border-green-500">
+                <h2 class="text-xl font-semibold mb-3 text-green-400">⚔️ 他/她克制谁？</h2>
+                <p id="counters" class="text-gray-300"></p>
+            </div>
+
+            <div class="bg-gray-800 p-6 rounded-xl shadow-lg border-l-4 border-blue-500">
+                <h2 class="text-xl font-semibold mb-3 text-blue-400">🛡️ 本英雄推荐出装</h2>
+                <p id="buildAdvice" class="text-gray-300 whitespace-pre-line"></p>
+            </div>
+            
+            <div class="bg-gray-800 p-6 rounded-xl shadow-lg border-l-4 border-purple-500">
+                <h2 class="text-xl font-semibold mb-3 text-purple-400">🎯 如何出装克制对方？(7.1d)</h2>
+                <p id="antiBuild" class="text-gray-300 whitespace-pre-line"></p>
+            </div>
+        </div>
+        
+        <div id="noResult" class="text-center text-gray-500 mt-10">请输入完整的英雄名字或外号进行查询</div>
+    </div>
+
+    <script>
+        // 核心数据库：包含所有英雄及其昵称（aliases）
+        const heroData = {
+            // --- 🪓 重装战士 ---
+            "德莱厄斯": {
+                aliases: ["诺手", "断头台"],
+                counteredBy: "提莫、薇恩、杰斯",
+                counters: "赛恩、蒙多、内瑟斯",
+                build: "核心：三相/黑切、血手。防装：亡者的板甲、自然之力。",
+                antiBuild: "防流血与拉扯：【铁板靴】减免平A伤害，近战必出【小反甲】。可以早出【光速双刃】或【亡者的板甲】提升移速防拉扯。"
+            },
+            "盖伦": {
+                aliases: ["大宝剑", "草丛伦"],
+                counteredBy: "卡蜜尔、薇恩、德莱厄斯",
+                counters: "贾克斯、雷克顿、锐雯",
+                build: "核心：黑切、血手。针对：自然之力/兰顿。",
+                antiBuild: "防高额回血与斩杀：【破败王者之刃】或【神圣分离者】打百分比伤害；对抗AD盖伦早出【守望者铠甲】过渡。"
+            },
+            "瑟提": {
+                aliases: ["腕豪", "劲夫"],
+                counteredBy: "雷克顿、沃利贝尔、杰斯",
+                counters: "艾瑞莉娅、亚索、盲僧",
+                build: "核心：破败、黑切、血手。",
+                antiBuild: "防巨额真伤与护盾：刺客/轻装战士必出【巨蛇之牙】破W护盾。对线期早出【铁板靴】和【小反甲】防平A与被动回血。"
+            },
+            "莫德凯撒": {
+                aliases: ["铁男", "金属大师"],
+                counteredBy: "奥拉夫、菲奥娜、薇恩",
+                counters: "墨菲特、赛恩、奥恩",
+                build: "核心：峡谷制造者、冰杖。防装：败魔、金身。",
+                antiBuild: "防关小黑屋与法系持续输出：首件必做【败魔】（魔抗与魔法盾天克铁男），鞋子选【水银鞋】（韧性+魔抗），附魔必选【中娅沙漏】在领域内拖时间。"
+            },
+            "亚托克斯": {
+                aliases: ["剑魔", "天神下凡"],
+                counteredBy: "艾瑞莉娅、菲奥娜、克烈",
+                counters: "赛恩、盖伦、蒙多",
+                build: "核心：黑切、死亡之舞、血手。",
+                antiBuild: "断绝吸血能力：第一次回家必须做出【死刑宣告】或【荆棘背心】（重伤）。由于其伤害全为物理，早补【铁板靴】性价比极高。"
+            },
+            "俄洛伊": {
+                aliases: ["触手妈", "海兽祭司"],
+                counteredBy: "提莫、莫德凯撒、格温",
+                counters: "雷克顿、瑟提、内瑟斯",
+                build: "核心：神圣分离者、黑切、死亡之舞。",
+                antiBuild: "克制阵地回复：同样首件必出【重伤散件】。拉扯阶段可出加速装备（如【幽梦】或鞋子附魔【正义荣耀】）方便躲避触手砸击。"
+            },
+            "沃利贝尔": {
+                aliases: ["狗熊", "不灭狂雷"],
+                counteredBy: "提莫、杰斯、墨菲特",
+                counters: "艾瑞莉娅、瑟提、卡蜜尔",
+                build: "核心：神分、纳什之牙(AP) / 破败(AD)。",
+                antiBuild: "防混合伤害与续航：【小反甲】断W回血。如果是AP狗熊出【败魔】，如果是AD狗熊出【冰霜之心】减攻速。"
+            },
+            "厄加特": {
+                aliases: ["螃蟹", "战车"],
+                counteredBy: "奥拉夫、慎、薇恩",
+                counters: "德莱厄斯、赛恩、盖伦",
+                build: "核心：小反甲、黑切、血手。",
+                antiBuild: "克制高频扫射：【荆棘背心】（小反甲）完美克制W技能的高频低伤。防装选择【兰顿之兆】或【守望者铠甲】，有效降低W输出。"
+            },
+            "内瑟斯": {
+                aliases: ["狗头", "沙漠死神"],
+                counteredBy: "德莱厄斯、奥拉夫、提莫",
+                counters: "凯南、贾克斯",
+                build: "核心：三相/神分、冰心、振奋。",
+                antiBuild: "防穿甲与留人：出【水银鞋】减免W枯萎的减速时间；战士出【黑切】/【多米尼克领主】，法师早做【虚空之杖】针对其高双抗。"
+            },
+
+            // --- 🗡️ 冲阵与轻装斗士 ---
+            "菲奥娜": {
+                aliases: ["剑姬", "无双剑姬"],
+                counteredBy: "墨菲特、潘森、雷克顿",
+                counters: "亚托克斯、莫德凯撒、瑟提",
+                build: "核心：神分、破败、贪欲九头蛇。",
+                antiBuild: "防单带与平A：【荆棘背心】断大招回血。由于真伤无法被护甲减免，【冰霜之心】或【守望者铠甲】的减攻速被动是减少破绽被击破频率的关键。"
+            },
+            "卡蜜尔": {
+                aliases: ["青钢影", "剪刀腿"],
+                counteredBy: "贾克斯、雷克顿、提莫",
+                counters: "盖伦、内瑟斯、德莱厄斯",
+                build: "核心：三相、死舞、血手。",
+                antiBuild: "防踢与真实伤害：卡蜜尔真伤随AD加成，出纯护甲收益低，需撑血量（如【心之钢】、【血手】）。对拼可出【铁板靴】减免Q1和普攻伤害。"
+            },
+            "贾克斯": {
+                aliases: ["武器", "武器大师"],
+                counteredBy: "墨菲特、盖伦、古拉加斯",
+                counters: "卡蜜尔、艾瑞莉娅、永恩",
+                build: "核心：三相、破败、死舞。",
+                antiBuild: "针对极高攻速：【冰霜之心】天克贾克斯！配合【兰顿之兆】和【铁板靴】，让其敲击速度犹如龟爬。"
+            },
+            "雷克顿": {
+                aliases: ["鳄鱼", "荒漠屠夫"],
+                counteredBy: "俄洛伊、盖伦、奥拉夫",
+                counters: "亚索、锐雯、卡蜜尔",
+                build: "核心：破败、黑切、死舞。",
+                antiBuild: "防红怒秒杀：【铁板靴】抗压。护盾英雄面对鳄鱼极其劣势（会被红怒W秒破盾），坦克直接堆【守望者铠甲】或【冰心】。"
+            },
+            "艾瑞莉娅": {
+                aliases: ["刀妹", "女刀"],
+                counteredBy: "瑟提、贾克斯、沃利贝尔",
+                counters: "杰斯、提莫、纳尔",
+                build: "核心：破败、三相、死舞。",
+                antiBuild: "断平A与吸血：必做【荆棘背心】和【冰霜之心】。她的被动附带魔法伤害，中期可补少量魔抗（如【水星鞋】）。"
+            },
+            "锐雯": {
+                aliases: ["放逐之刃", "光速QA"],
+                counteredBy: "雷克顿、波比、盖伦",
+                counters: "脆皮长手、格温、永恩",
+                build: "核心：黑切、死舞、神分。",
+                antiBuild: "防纯物理爆发：【铁板靴】加【守望者铠甲】，护甲堆起来后锐雯的连招就像在刮痧。"
+            },
+            "潘森": {
+                aliases: ["斯巴达", "不屈之枪"],
+                counteredBy: "赛恩、奥恩、墨菲特",
+                counters: "菲奥娜、提莫、锐雯",
+                build: "核心：幽梦、黑切、死舞。",
+                antiBuild: "防前期穿甲爆发：前期尽早出【布甲】或【铁板靴】，潘森的穿甲在前期面对基础护甲高的装备收益极低。"
+            },
+            "奥拉夫": {
+                aliases: ["疯狗", "狂战士"],
+                counteredBy: "贾克斯、卡蜜尔、菲奥娜",
+                counters: "莫德凯撒、厄加特、潘森",
+                build: "核心：三相/神分、血手、死舞。",
+                antiBuild: "防狂战士疯砍：大招期间免疫控制，唯有减伤和减攻速有效。出【兰顿之兆】或【冰霜之心】应对，必备【死刑宣告/小反甲】压制其被动吸血。"
+            },
+            "亚索": {
+                aliases: ["快乐风男", "托儿索"],
+                counteredBy: "雷克顿、瑟提、德莱厄斯",
+                counters: "纳尔、提莫",
+                build: "核心：破败、烈阳魔刃、无尽。",
+                antiBuild: "克制百分百暴击：【兰顿之兆】绝对天克亚索/永恩两兄弟（减少暴击伤害）。配合【铁板靴】能吸收成吨伤害。"
+            },
+            "永恩": {
+                aliases: ["封魔剑魂"],
+                counteredBy: "雷克顿、贾克斯、潘森",
+                counters: "赛恩、蒙多",
+                build: "核心：破败、烈阳魔刃、无尽。",
+                antiBuild: "克制混合暴击伤害：同样首选【兰顿之兆】，由于永恩带有较高魔法伤害，【铁板靴】换成【水银鞋】（减控+魔抗）效果更佳。"
+            },
+            "悟空": {
+                aliases: ["猴子", "齐天大圣"],
+                counteredBy: "盖伦、德莱厄斯、墨菲特",
+                counters: "杰斯、提莫、凯南",
+                build: "核心：神分、黑切、死舞。",
+                antiBuild: "防破甲与分身：出【铁板靴】和【兰顿之兆】。使用具有真实视野或AOE伤害的英雄/装备能在其隐身时追踪位置。"
+            },
+
+            // --- 🛡️ 坦克前排 ---
+            "墨菲特": {
+                aliases: ["石头人", "混分巨兽"],
+                counteredBy: "塞拉斯、莫德凯撒、格温",
+                counters: "贾克斯、菲奥娜、泰达米尔",
+                build: "核心：日炎、冰心、败魔。",
+                antiBuild: "防大招强开与护甲转伤害：首件做【败魔】极大削减其消耗。AD英雄必出【黑色切割者】或【多米尼克领主】应对其超高护甲。"
+            },
+            "赛恩": {
+                aliases: ["老司机", "亡灵战神"],
+                counteredBy: "亚托克斯、德莱厄斯、格温",
+                counters: "提莫、阿卡丽、潘森",
+                build: "核心：日炎、心之钢、反甲。",
+                antiBuild: "克制无限叠加血量：必出百分比伤害装备！AD出【破败王者之刃】或【神圣分离者】，AP出【兰德里的苦楚】（大面具）与【峡谷制造者】。"
+            },
+            "奥恩": {
+                aliases: ["打铁匠", "山隐之焰"],
+                counteredBy: "菲奥娜、格温、莫德凯撒",
+                counters: "潘森、锐雯、雷克顿",
+                build: "核心：日炎、冰脉护手、深渊面具。",
+                antiBuild: "防易碎真伤与控制：【水银鞋】必备。打坦依然依赖【破败】、【神分】或法师的【大面具】。"
+            },
+            "蒙多医生": {
+                aliases: ["蒙多", "想去哪就去哪"],
+                counteredBy: "亚托克斯、德莱厄斯、薇恩",
+                counters: "提莫、格温、阿卡丽",
+                build: "核心：心之钢、日炎、振奋。",
+                antiBuild: "限制极速回血：【死刑宣告/莫雷洛秘典】是硬指标。由于蒙多血量极高但双抗相对一般，【破败王者之刃】刀刀到肉。"
+            },
+            "奎桑提": {
+                aliases: ["黑哥", "纳祖芒荣耀"],
+                counteredBy: "盖伦、德莱厄斯、莫德凯撒",
+                counters: "贾克斯、艾瑞莉娅、锐雯",
+                build: "核心：败魔、冰脉护手、千变者贾修。",
+                antiBuild: "防双抗转输出：大招后双抗降低，保留爆发技能在他开大后再交。AD战士早做【黑色切割者】，法师做【虚空之杖】。"
+            },
+            "慎": {
+                aliases: ["腰子", "暮光之眼"],
+                counteredBy: "莫德凯撒、德莱厄斯、格温",
+                counters: "贾克斯、卡蜜尔、雷克顿",
+                build: "核心：日炎、巨九、自然之力。",
+                antiBuild: "防Q技能魔法百分比伤害：即使是物理对线，也可以早做一件【幽魂斗篷】或【败魔】散件，慎的对线输出大部分是魔法伤害。推线装（如【提亚马特】）可以把他锁在塔下。"
+            },
+
+            // --- 🏹 法系与长手 ---
+            "格温": {
+                aliases: ["剪刀娘", "灵罗娃娃"],
+                counteredBy: "锐雯、贾克斯、菲奥娜",
+                counters: "赛恩、奥恩、蒙多",
+                build: "核心：峡谷、纳什之牙、帽子。",
+                antiBuild: "防魔法真伤与吸血：【败魔】是第一核心防装，搭配【小反甲/死刑宣告】遏制其极强的被动回血。"
+            },
+            "提莫": {
+                aliases: ["提莫队长", "种蘑菇的"],
+                counteredBy: "艾瑞莉娅、潘森、墨菲特",
+                counters: "盖伦、德莱厄斯、俄洛伊",
+                build: "核心：纳什、面具、无限法球。",
+                antiBuild: "防折磨与蘑菇阵：【败魔】天克提莫毒性伤害，鞋子必出【水银鞋】（减致盲时间）。辅助或打野上线前一定要换【扫描】排蘑菇。"
+            },
+            "杰斯": {
+                aliases: ["高富帅", "未来守护者"],
+                counteredBy: "艾瑞莉娅、墨菲特、悟空",
+                counters: "德莱厄斯、盖伦、瑟提",
+                build: "核心：魔宗、幽梦、黑切。",
+                antiBuild: "防双形态爆发：纯物理穿甲英雄，【铁板靴】与【守望者铠甲】/【布甲】极大幅度降低其EQ二连的消耗收益。"
+            },
+            "凯南": {
+                aliases: ["电耗子", "狂暴之心"],
+                counteredBy: "艾瑞莉娅、赛恩、墨菲特",
+                counters: "贾克斯、盖伦、雷克顿",
+                build: "核心：推推棒、帽子、法穿棒。",
+                antiBuild: "防天雷进场：上单对线早出【水银鞋】和【败魔】散件。附魔【中娅沙漏】（金身）或【排斥附魔】（推推附魔）可以在他开大进场时化解危机。"
+            },
+            "薇恩": {
+                aliases: ["VN", "暗夜猎手"],
+                counteredBy: "提莫、潘森、墨菲特",
+                counters: "莫德凯撒、盖伦、赛恩",
+                build: "核心：破败、电刃、无尽。",
+                antiBuild: "防三环真伤拉扯：真伤无法防御，只能减其攻速！【冰霜之心】与【兰顿之兆】是针对上单薇恩的最佳防具，鞋子必选【铁板靴】。"
+            },
+            "弗拉基米尔": {
+                aliases: ["吸血鬼", "猩红收割者"],
+                counteredBy: "锐雯、艾瑞莉娅、卡蜜尔",
+                counters: "坦克、大部分重装战士",
+                build: "核心：星界驱驰、帽子、法穿棒。",
+                antiBuild: "断绝无限续航：第一次回家第一件装备**必须**是【死刑宣告】或【莫雷洛秘典】散件。防御装必选【败魔】。"
+            },
+            "阿卡丽": {
+                aliases: ["离群之刺"],
+                counteredBy: "盖伦、雷克顿、潘森",
+                counters: "提莫、杰斯、纳尔",
+                build: "核心：发电机、帽子、法穿棒。",
+                antiBuild: "防霞阵与斩杀爆发：【败魔】的魔法护盾让阿卡丽极难计算斩杀线。携带【扫描】可以在她开启W（霞阵）时看见红影进行预判。"
+            }
+        };
+
+        function searchHero() {
+            const input = document.getElementById('searchInput').value.trim();
+            const resultDiv = document.getElementById('result');
+            const noResult = document.getElementById('noResult');
+            
+            if (input === "") {
+                resultDiv.classList.add('hidden');
+                noResult.classList.remove('hidden');
+                return;
+            }
+
+            let foundData = null;
+            let foundName = "";
+
+            // 遍历所有英雄，匹配正名或外号
+            for (const [name, data] of Object.entries(heroData)) {
+                if (name === input || (data.aliases && data.aliases.includes(input))) {
+                    foundData = data;
+                    foundName = name;
+                    break;
+                }
+            }
+            
+            if (foundData) {
+                resultDiv.classList.remove('hidden');
+                noResult.classList.add('hidden');
+                
+                // 动态显示英雄名称和外号
+                const aliasesText = foundData.aliases.length > 0 ? ` (${foundData.aliases.join(' / ')})` : '';
+                document.getElementById('heroNameTitle').innerText = `${foundName}${aliasesText}`;
+                
+                document.getElementById('counteredBy').innerText = foundData.counteredBy;
+                document.getElementById('counters').innerText = foundData.counters;
+                document.getElementById('buildAdvice').innerText = foundData.build;
+                document.getElementById('antiBuild').innerText = foundData.antiBuild;
+            } else {
+                resultDiv.classList.add('hidden');
+                noResult.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
