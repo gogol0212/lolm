@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wild Rift 7.1f - 上单 BP 战术助手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&display=swap');
+        
+        :root {
+            --hex-bg-deep: #010a13;
+            --hex-card-bg: #0a1428;
+            --hex-gold-main: #c89b3c;
+            --hex-gold-light: #f0e6d2;
+            --hex-gold-dark: #785a28;
+            --hex-blue-accent: #0397ab;
+            --hex-border: rgba(200, 155, 60, 0.3);
+        }
+
+        body {
+            background-color: var(--hex-bg-deep);
+            color: var(--hex-gold-light);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(3, 151, 171, 0.15), transparent 40%),
+                linear-gradient(180deg, #010a13 0%, #0a1428 100%);
+            min-height: 100vh;
+        }
+
+        .lol-title {
+            font-family: 'Noto Serif SC', serif;
+            color: var(--hex-gold-main);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .lol-card {
+            background-color: rgba(10, 20, 40, 0.85);
+            border: 1px solid var(--hex-border);
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5), 0 4px 15px rgba(0,0,0,0.6);
+            backdrop-filter: blur(10px);
+            position: relative;
+        }
+
+        .lol-card::before, .lol-card::after {
+            content: '';
+            position: absolute;
+            top: -1px;
+            width: 15px;
+            height: 15px;
+            border-top: 2px solid var(--hex-gold-main);
+        }
+        .lol-card::before { left: -1px; border-left: 2px solid var(--hex-gold-main); }
+        .lol-card::after { right: -1px; border-right: 2px solid var(--hex-gold-main); }
+
+        .search-input {
+            background-color: rgba(1, 10, 19, 0.8);
+            border: 2px solid var(--hex-gold-dark);
+            color: var(--hex-gold-light);
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            border-color: var(--hex-gold-main);
+            box-shadow: 0 0 15px rgba(200, 155, 60, 0.2);
+            outline: none;
+        }
+
+        .tier-S { color: #ff4e50; text-shadow: 0 0 8px rgba(255, 78, 80, 0.4); font-weight: bold; }
+        .tier-A { color: #f9d423; text-shadow: 0 0 8px rgba(249, 212, 35, 0.4); font-weight: bold; }
+        
+        .tag-chip {
+            background: linear-gradient(90deg, rgba(200,155,60,0.15) 0%, rgba(200,155,60,0.05) 100%);
+            border: 1px solid var(--hex-border);
+            color: var(--hex-gold-main);
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem;
+        }
+
+        .item-chip {
+            background: rgba(3, 151, 171, 0.15);
+            border: 1px solid rgba(3, 151, 171, 0.4);
+            color: #a0e8f5;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--hex-bg-deep); }
+        ::-webkit-scrollbar-thumb { background: var(--hex-gold-dark); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--hex-gold-main); }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+<div class="max-w-4xl mx-auto">
+    <div class="text-center mb-10 mt-4">
+        <div class="inline-block px-4 py-1 border border-[#c89b3c]/30 text-[#0397ab] text-xs tracking-widest uppercase mb-4 bg-[#0a1428]/50">
+            Wild Rift Patch 7.1f Complete Edition
+        </div>
+        <h1 class="text-4xl md:text-5xl font-black lol-title mb-3">上单 BP 战术助手</h1>
+        <p class="text-[#785a28] text-sm tracking-wider">输入敌方上单，获取最优 Counter 策略与情景化图文出装</p>
+    </div>
+
+    <div class="relative mb-10 z-10">
+        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <svg class="h-5 w-5 text-[#c89b3c]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+        </div>
+        <input type="text" id="searchInput" 
+            class="w-full search-input py-4 pl-12 pr-4 text-lg font-medium placeholder-[#785a28]"
+            placeholder="正在加载数据库..." 
+            autocomplete="off"
+            disabled>
+    </div>
+
+    <div id="suggestions" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8 hidden"></div>
+
+    <div id="resultPanel" class="lol-card p-6 md:p-8 hidden">
+        <div class="border-b border-[#c89b3c]/30 pb-4 mb-6 flex items-center justify-between">
+            <div>
+                <h2 id="enemyName" class="text-3xl font-bold lol-title text-white"></h2>
+                <div id="enemyTags" class="flex flex-wrap gap-2 mt-3"></div>
+            </div>
+            <div class="text-right hidden sm:block">
+                <div class="text-[#785a28] text-xs uppercase tracking-widest">Target Acquired</div>
+                <div class="text-[#c89b3c] font-bold mt-1">敌方档案已确认</div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div class="space-y-6 md:col-span-1">
+                <div>
+                    <h3 class="text-[#0397ab] font-bold text-lg mb-3 uppercase flex items-center gap-2">
+                        <span class="w-2 h-2 bg-[#0397ab] rotate-45 inline-block"></span> 推荐选角 (Counter)
+                    </h3>
+                    <div class="bg-[#010a13]/60 p-4 border border-[#0a1428]">
+                        <div class="mb-4">
+                            <span class="tier-S text-sm block mb-2">S级 (极度克制)</span>
+                            <div id="counterS" class="flex flex-wrap gap-2"></div>
+                        </div>
+                        <div>
+                            <span class="tier-A text-sm block mb-2">A级 (优势对线)</span>
+                            <div id="counterA" class="flex flex-wrap gap-2"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="md:col-span-2 space-y-6">
+                <div>
+                    <h3 class="text-[#c89b3c] font-bold text-lg mb-3 uppercase flex items-center gap-2">
+                        <span class="w-2 h-2 bg-[#c89b3c] rotate-45 inline-block"></span> 核心针对装备 (Anti-Build)
+                    </h3>
+                    <div class="bg-[#010a13]/60 p-4 border border-[#0a1428]">
+                        <div class="text-[#785a28] text-sm mb-4">基于敌方英雄属性标签，强烈建议优先考虑以下针对装备：</div>
+                        <div id="antiItems" class="flex flex-wrap gap-3"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-[#f0e6d2] font-bold text-lg mb-3 uppercase flex items-center gap-2">
+                        <span class="w-2 h-2 bg-[#f0e6d2] rotate-45 inline-block"></span> 对线核心口诀
+                    </h3>
+                    <div class="bg-[#010a13]/60 p-5 border border-[#0a1428]">
+                        <ul id="tipsList" class="space-y-3 text-sm leading-relaxed text-[#c8aa6e] list-disc pl-4"></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="emptyState" class="text-center py-16 opacity-50">
+        <svg class="w-16 h-16 mx-auto text-[#785a28] mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+        </svg>
+        <p id="emptyStateText" class="text-[#785a28] text-lg font-serif">正在初始化数据库连接...</p>
+    </div>
+</div>
+
+<script>
+    let itemIcons = {};
+    let itemDictionary = {};
+    let bpDatabase = {};
+
+    const searchInput = document.getElementById('searchInput');
+    const suggestionsPanel = document.getElementById('suggestions');
+    const resultPanel = document.getElementById('resultPanel');
+    const emptyState = document.getElementById('emptyState');
+    const emptyStateText = document.getElementById('emptyStateText');
+
+    async function initApp() {
+        try {
+            const response = await fetch('heroes.json');
+            if (!response.ok) {
+                throw new Error('网络请求失败');
+            }
+            const data = await response.json();
+            
+            // 加载包含新版图标信息的 JSON 数据
+            itemIcons = data.itemIcons || {};
+            itemDictionary = data.itemDictionary;
+            bpDatabase = data.bpDatabase;
+            
+            const heroCount = Object.keys(bpDatabase).length;
+            emptyStateText.textContent = `等待 BP 指令输入... (已载入 ${heroCount} 名上单数据)`;
+            searchInput.placeholder = "对面选了什么？(例如：奥恩、腕豪、剑姬)...";
+            searchInput.disabled = false;
+            
+            searchInput.addEventListener('input', handleSearch);
+
+        } catch (error) {
+            console.error('加载英雄数据库失败:', error);
+            emptyStateText.textContent = '数据库加载失败。请确保 index.html 和 heroes.json 在同一文件夹，并已部署至服务器环境。';
+            searchInput.placeholder = "读取数据失败";
+        }
+    }
+
+    // 生成出装对象 (附带图标链接)
+    function generateAntiItems(tags) {
+        let itemsMap = new Map();
+        tags.forEach(tag => {
+            if (itemDictionary[tag]) {
+                itemDictionary[tag].forEach(itemName => {
+                    if (!itemsMap.has(itemName)) {
+                        itemsMap.set(itemName, itemIcons[itemName] || "");
+                    }
+                });
+            }
+        });
+        
+        return Array.from(itemsMap, ([name, iconUrl]) => ({ name, iconUrl })).slice(0, 5); 
+    }
+
+    function renderHero(name, data) {
+        suggestionsPanel.classList.add('hidden');
+        emptyState.classList.add('hidden');
+        resultPanel.classList.remove('hidden');
+
+        document.getElementById('enemyName').textContent = name;
+        
+        const tagsHtml = data.tags.map(tag => `<span class="tag-chip rounded-full">${tag}</span>`).join('');
+        document.getElementById('enemyTags').innerHTML = tagsHtml;
+
+        document.getElementById('counterS').innerHTML = data.counters.S.map(h => `<span class="px-3 py-1 bg-red-500/10 border border-red-500/30 text-red-300 rounded text-sm">${h}</span>`).join('');
+        document.getElementById('counterA').innerHTML = data.counters.A.map(h => `<span class="px-3 py-1 bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 rounded text-sm">${h}</span>`).join('');
+
+        // 渲染带图标的出装面板
+        const antiItemsData = generateAntiItems(data.tags);
+        document.getElementById('antiItems').innerHTML = antiItemsData.map(item => `
+            <div class="item-chip px-3 py-1.5 rounded-md text-sm font-medium tracking-wide">
+                ${item.iconUrl ? `<img src="${item.iconUrl}" class="w-7 h-7 rounded border border-[#0397ab]/40 shadow-sm" alt="${item.name}" onerror="this.style.display='none'">` : ''}
+                <span>${item.name}</span>
+            </div>
+        `).join('');
+
+        document.getElementById('tipsList').innerHTML = data.tips.map(tip => `<li>${tip}</li>`).join('');
+    }
+
+    function handleSearch() {
+        const query = searchInput.value.trim().toLowerCase();
+        
+        if (!query) {
+            suggestionsPanel.classList.add('hidden');
+            resultPanel.classList.add('hidden');
+            emptyState.classList.remove('hidden');
+            return;
+        }
+
+        const matches = [];
+        for (const [name, data] of Object.entries(bpDatabase)) {
+            if (name.includes(query) || data.aliases.some(alias => alias.includes(query))) {
+                matches.push({ name, data });
+            }
+        }
+
+        if (matches.length === 1 && matches[0].name === query) {
+            renderHero(matches[0].name, matches[0].data);
+        } else if (matches.length > 0) {
+            resultPanel.classList.add('hidden');
+            emptyState.classList.add('hidden');
+            suggestionsPanel.classList.remove('hidden');
+            
+            suggestionsPanel.innerHTML = matches.map(match => `
+                <button onclick="selectHero('${match.name}')" class="lol-card p-3 text-left hover:bg-[#0397ab]/10 transition-colors group">
+                    <div class="text-[#c89b3c] font-bold group-hover:text-[#f0e6d2]">${match.name}</div>
+                    <div class="text-[#785a28] text-xs mt-1 truncate">${match.data.aliases.join(' / ')}</div>
+                </button>
+            `).join('');
+        } else {
+            suggestionsPanel.classList.add('hidden');
+            resultPanel.classList.add('hidden');
+            emptyState.classList.remove('hidden');
+        }
+    }
+
+    window.selectHero = function(name) {
+        searchInput.value = name;
+        renderHero(name, bpDatabase[name]);
+    };
+
+    document.addEventListener('keydown', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            searchInput.focus();
+        }
+    });
+
+    initApp();
+
+</script>
+</body>
+</html>
