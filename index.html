@@ -162,7 +162,7 @@
                         <span class="w-2 h-2 bg-[#c89b3c] rotate-45 inline-block"></span> 核心针对装备 (Anti-Build)
                     </h3>
                     <div class="bg-[#010a13]/60 p-4 border border-[#0a1428]">
-                        <div class="text-[#785a28] text-sm mb-4">基于敌方英雄属性标签，强烈建议优先考虑以下针对装备：</div>
+                        <div id="antiBuildContext" class="text-[#785a28] text-sm mb-4">基于敌方英雄属性标签，强烈建议优先考虑以下针对装备：</div>
                         <div id="antiItems" class="flex flex-wrap gap-3"></div>
                     </div>
                 </div>
@@ -227,6 +227,9 @@
     let ownChampionProfiles = {};
     let activeItemProfiles = {};
     let equipmentCatalog = {};
+    let championStrategies = {};
+    let counterItemMatrix = {};
+    let matchupOverrides = {};
     let currentEnemy = null;
 
     const searchInput = document.getElementById('searchInput');
@@ -253,6 +256,9 @@
             ownChampionProfiles = data.ownChampionProfiles || {};
             activeItemProfiles = data.activeItemProfiles || {};
             equipmentCatalog = data.equipmentCatalog || {};
+            championStrategies = data.championStrategies || {};
+            counterItemMatrix = data.counterItemMatrix || {};
+            matchupOverrides = data.matchupOverrides || {};
             document.getElementById('patchVersion').textContent = patchInfo.version || '7.2a';
             
             const heroCount = Object.keys(bpDatabase).length;
@@ -278,19 +284,34 @@
     }
 
     // 生成出装对象 (附带图标链接)
-    function generateAntiItems(tags) {
+    function generateAntiItems(enemyName, tags, ownName) {
         let itemsMap = new Map();
-        tags.forEach(tag => {
-            if (itemDictionary[tag]) {
-                itemDictionary[tag].forEach(itemName => {
-                    if (!itemsMap.has(itemName)) {
-                        itemsMap.set(itemName, itemIcons[itemName] || "");
-                    }
-                });
-            }
+        const ownProfile = ownChampionProfiles[ownName];
+        const override = matchupOverrides[enemyName]?.[ownName];
+        const addItems = names => (names || []).forEach(itemName => {
+            if (!itemsMap.has(itemName)) itemsMap.set(itemName, itemIcons[itemName] || "");
         });
+
+        if (ownProfile) {
+            addItems(override?.items);
+            if (!override?.skipTags) tags.forEach(tag => addItems(counterItemMatrix[tag]?.[ownProfile.class]));
+            addItems(championStrategies[ownName]?.items);
+        } else {
+            tags.forEach(tag => addItems(itemDictionary[tag]));
+        }
         
-        return Array.from(itemsMap, ([name, iconUrl]) => ({ name, iconUrl })).slice(0, 5); 
+        return Array.from(itemsMap, ([name, iconUrl]) => ({ name, iconUrl })).slice(0, 6);
+    }
+
+    function generateMatchupTips(enemyName, enemyData, ownName) {
+        if (!ownName) return enemyData.tips;
+        const override = matchupOverrides[enemyName]?.[ownName];
+        const strategy = championStrategies[ownName];
+        const result = [];
+        if (override?.tips) result.push(...override.tips);
+        if (strategy?.tip) result.push(`【${ownName}打法】${strategy.tip}`);
+        result.push(...enemyData.tips.slice(0, override ? 1 : 2));
+        return result.slice(0, 4);
     }
 
     function selectDefensiveBootRoute(tags) {
@@ -348,7 +369,11 @@
         document.getElementById('counterA').innerHTML = data.counters.A.map(h => `<span class="px-3 py-1 bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 rounded text-sm">${h}</span>`).join('');
 
         // 渲染带图标的出装面板
-        const antiItemsData = generateAntiItems(data.tags);
+        const ownName = ownChampionSelect.value;
+        const antiItemsData = generateAntiItems(name, data.tags, ownName);
+        document.getElementById('antiBuildContext').textContent = ownName ?
+            `已按「${ownName} vs ${name}」过滤可用装备；专属对局建议优先于通用标签。` :
+            '尚未选择己方英雄，当前显示通用反制装备。';
         document.getElementById('antiItems').innerHTML = antiItemsData.map(item => `
             <div class="item-chip px-3 py-1.5 rounded-md text-sm font-medium tracking-wide">
                 ${item.iconUrl ? `<img src="${item.iconUrl}" class="w-7 h-7 rounded border border-[#0397ab]/40 shadow-sm" alt="${item.name}" onerror="this.style.display='none'">` : ''}
@@ -357,7 +382,6 @@
         `).join('');
 
         const defensiveBoot = selectDefensiveBootRoute(data.tags);
-        const ownName = ownChampionSelect.value;
         const ownProfile = ownChampionProfiles[ownName];
         const carryBoot = ownProfile ? bootRoutes[ownProfile.boot] : null;
         const isSameRoute = carryBoot && defensiveBoot && carryBoot.level3 === defensiveBoot.level3;
@@ -373,7 +397,8 @@
             '<div class="text-[#785a28] text-xs mt-1">7.2 后主动装备按职业开放，商店内若显示不可购买，以游戏内职业判定为准。</div>' :
             '<div class="text-[#785a28]">选择己方英雄后显示可用主动装备。</div>';
 
-        document.getElementById('tipsList').innerHTML = data.tips.map(tip => `<li>${tip}</li>`).join('');
+        const matchupTips = generateMatchupTips(name, data, ownName);
+        document.getElementById('tipsList').innerHTML = matchupTips.map(tip => `<li>${tip}</li>`).join('');
     }
 
     function handleSearch() {
