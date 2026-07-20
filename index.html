@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wild Rift 7.1f - 上单 BP 战术助手</title>
+    <title>Wild Rift 7.2a - 上单 BP 战术助手</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&display=swap');
@@ -99,7 +99,7 @@
 <div class="max-w-4xl mx-auto">
     <div class="text-center mb-10 mt-4">
         <div class="inline-block px-4 py-1 border border-[#c89b3c]/30 text-[#0397ab] text-xs tracking-widest uppercase mb-4 bg-[#0a1428]/50">
-            Wild Rift Patch 7.1f Complete Edition
+            Wild Rift Patch <span id="patchVersion">7.2a</span> Complete Edition
         </div>
         <h1 class="text-4xl md:text-5xl font-black lol-title mb-3">上单 BP 战术助手</h1>
         <p class="text-[#785a28] text-sm tracking-wider">输入敌方上单，获取最优 Counter 策略与情景化图文出装</p>
@@ -163,6 +163,16 @@
                 </div>
 
                 <div>
+                    <h3 class="text-[#0397ab] font-bold text-lg mb-3 uppercase flex items-center gap-2">
+                        <span class="w-2 h-2 bg-[#0397ab] rotate-45 inline-block"></span> 7.2a 鞋子路线
+                    </h3>
+                    <div class="bg-[#010a13]/60 p-4 border border-[#0a1428]">
+                        <div id="bootRoute" class="space-y-2"></div>
+                        <div class="text-[#785a28] text-xs mt-3">三级鞋统一在 10:00 后开放。鞋子不再附魔；金身、推推棒、水银、石像鬼等现为按职业限制的完整主动装备。</div>
+                    </div>
+                </div>
+
+                <div>
                     <h3 class="text-[#f0e6d2] font-bold text-lg mb-3 uppercase flex items-center gap-2">
                         <span class="w-2 h-2 bg-[#f0e6d2] rotate-45 inline-block"></span> 对线核心口诀
                     </h3>
@@ -186,6 +196,8 @@
     let itemIcons = {};
     let itemDictionary = {};
     let bpDatabase = {};
+    let bootRoutes = {};
+    let patchInfo = {};
 
     const searchInput = document.getElementById('searchInput');
     const suggestionsPanel = document.getElementById('suggestions');
@@ -205,6 +217,9 @@
             itemIcons = data.itemIcons || {};
             itemDictionary = data.itemDictionary;
             bpDatabase = data.bpDatabase;
+            bootRoutes = data.bootRoutes || {};
+            patchInfo = data.patch || {};
+            document.getElementById('patchVersion').textContent = patchInfo.version || '7.2a';
             
             const heroCount = Object.keys(bpDatabase).length;
             emptyStateText.textContent = `等待 BP 指令输入... (已载入 ${heroCount} 名上单数据)`;
@@ -236,6 +251,12 @@
         return Array.from(itemsMap, ([name, iconUrl]) => ({ name, iconUrl })).slice(0, 5); 
     }
 
+    function selectBootRoute(tags) {
+        if (tags.includes('魔法消耗') || tags.includes('AP坦克')) return bootRoutes.magic;
+        if (tags.includes('平A依赖') || tags.includes('暴击怪') || tags.includes('物理爆发')) return bootRoutes.physical;
+        return bootRoutes.sustain;
+    }
+
     function renderHero(name, data) {
         suggestionsPanel.classList.add('hidden');
         emptyState.classList.add('hidden');
@@ -257,6 +278,17 @@
                 <span>${item.name}</span>
             </div>
         `).join('');
+
+        const boot = selectBootRoute(data.tags);
+        document.getElementById('bootRoute').innerHTML = boot ? `
+            <div class="flex flex-wrap items-center gap-2 text-sm">
+                <span class="px-2.5 py-1 border border-[#0397ab]/40 text-[#a0e8f5] rounded">${boot.level2}</span>
+                <span class="text-[#785a28]">→ 10:00 后 →</span>
+                <span class="px-2.5 py-1 border border-[#c89b3c]/50 text-[#f0e6d2] rounded">${boot.level3}</span>
+            </div>
+            <div class="text-[#c8aa6e] text-sm leading-relaxed">${boot.reason}</div>
+            <div class="text-[#785a28] text-xs">${boot.timing}</div>
+        ` : '<div class="text-[#785a28] text-sm">根据己方英雄职业与对局威胁选择鞋子。</div>';
 
         document.getElementById('tipsList').innerHTML = data.tips.map(tip => `<li>${tip}</li>`).join('');
     }
