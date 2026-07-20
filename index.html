@@ -284,23 +284,38 @@
     }
 
     // 生成出装对象 (附带图标链接)
+    function uniqueNames(names) {
+        return [...new Set((names || []).filter(Boolean))];
+    }
+
     function generateAntiItems(enemyName, tags, ownName) {
-        let itemsMap = new Map();
         const ownProfile = ownChampionProfiles[ownName];
         const override = matchupOverrides[enemyName]?.[ownName];
-        const addItems = names => (names || []).forEach(itemName => {
-            if (!itemsMap.has(itemName)) itemsMap.set(itemName, itemIcons[itemName] || "");
-        });
 
-        if (ownProfile) {
-            addItems(override?.items);
-            if (!override?.skipTags) tags.forEach(tag => addItems(counterItemMatrix[tag]?.[ownProfile.class]));
-            addItems(championStrategies[ownName]?.items);
-        } else {
-            tags.forEach(tag => addItems(itemDictionary[tag]));
+        if (!ownProfile) {
+            const genericItems = tags.flatMap(tag => itemDictionary[tag] || []);
+            return uniqueNames(genericItems).slice(0, 6).map(name => ({
+                name,
+                iconUrl: itemIcons[name] || ""
+            }));
         }
-        
-        return Array.from(itemsMap, ([name, iconUrl]) => ({ name, iconUrl })).slice(0, 6);
+
+        const coreItems = championStrategies[ownName]?.items || [];
+        let names;
+
+        if (override?.skipTags) {
+            names = uniqueNames([...(override.items || []), ...coreItems]);
+        } else {
+            const counterItems = uniqueNames(tags.flatMap(
+                tag => counterItemMatrix[tag]?.[ownProfile.class] || []
+            ));
+            names = uniqueNames([...counterItems.slice(0, 4), ...coreItems.slice(0, 2)]);
+        }
+
+        return names.slice(0, 6).map(name => ({
+            name,
+            iconUrl: itemIcons[name] || ""
+        }));
     }
 
     function generateMatchupTips(enemyName, enemyData, ownName) {
