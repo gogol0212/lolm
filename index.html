@@ -102,20 +102,25 @@
             Wild Rift Patch <span id="patchVersion">7.2a</span> Complete Edition
         </div>
         <h1 class="text-4xl md:text-5xl font-black lol-title mb-3">上单 BP 战术助手</h1>
-        <p class="text-[#785a28] text-sm tracking-wider">输入敌方上单，获取最优 Counter 策略与情景化图文出装</p>
+        <p class="text-[#785a28] text-sm tracking-wider">先选己方英雄，再输入敌方上单，获得 7.2a 情景化鞋子与反制装备</p>
     </div>
 
-    <div class="relative mb-10 z-10">
-        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <svg class="h-5 w-5 text-[#c89b3c]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-10 z-10 relative">
+        <select id="ownChampionSelect" class="search-input py-4 px-4 text-base font-medium" disabled>
+            <option value="">选择我方上单（推荐）</option>
+        </select>
+        <div class="relative md:col-span-2">
+            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <svg class="h-5 w-5 text-[#c89b3c]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </div>
+            <input type="text" id="searchInput" 
+                class="w-full search-input py-4 pl-12 pr-4 text-lg font-medium placeholder-[#785a28]"
+                placeholder="正在加载数据库..." 
+                autocomplete="off"
+                disabled>
         </div>
-        <input type="text" id="searchInput" 
-            class="w-full search-input py-4 pl-12 pr-4 text-lg font-medium placeholder-[#785a28]"
-            placeholder="正在加载数据库..." 
-            autocomplete="off"
-            disabled>
     </div>
 
     <div id="suggestions" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8 hidden"></div>
@@ -173,6 +178,15 @@
                 </div>
 
                 <div>
+                    <h3 class="text-[#c89b3c] font-bold text-lg mb-3 uppercase flex items-center gap-2">
+                        <span class="w-2 h-2 bg-[#c89b3c] rotate-45 inline-block"></span> 主动装备建议
+                    </h3>
+                    <div class="bg-[#010a13]/60 p-4 border border-[#0a1428]">
+                        <div id="activeRecommendation" class="space-y-2 text-sm"></div>
+                    </div>
+                </div>
+
+                <div>
                     <h3 class="text-[#f0e6d2] font-bold text-lg mb-3 uppercase flex items-center gap-2">
                         <span class="w-2 h-2 bg-[#f0e6d2] rotate-45 inline-block"></span> 对线核心口诀
                     </h3>
@@ -190,6 +204,18 @@
         </svg>
         <p id="emptyStateText" class="text-[#785a28] text-lg font-serif">正在初始化数据库连接...</p>
     </div>
+
+    <details class="lol-card mt-8 p-5" id="equipmentLibrary">
+        <summary class="cursor-pointer text-[#c89b3c] font-bold text-lg">7.2a 装备速查库（完整鞋线与主动装备）</summary>
+        <div class="mt-5">
+            <h3 class="text-[#0397ab] font-bold mb-3">7 条鞋子升级路线</h3>
+            <div id="allBoots" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+            <h3 class="text-[#0397ab] font-bold mt-7 mb-3">主动装备（原鞋子附魔体系）</h3>
+            <div id="allActiveItems" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+            <h3 class="text-[#0397ab] font-bold mt-7 mb-3">7.2 新增法师装备</h3>
+            <div id="allMageItems" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+        </div>
+    </details>
 </div>
 
 <script>
@@ -198,12 +224,17 @@
     let bpDatabase = {};
     let bootRoutes = {};
     let patchInfo = {};
+    let ownChampionProfiles = {};
+    let activeItemProfiles = {};
+    let equipmentCatalog = {};
+    let currentEnemy = null;
 
     const searchInput = document.getElementById('searchInput');
     const suggestionsPanel = document.getElementById('suggestions');
     const resultPanel = document.getElementById('resultPanel');
     const emptyState = document.getElementById('emptyState');
     const emptyStateText = document.getElementById('emptyStateText');
+    const ownChampionSelect = document.getElementById('ownChampionSelect');
 
     async function initApp() {
         try {
@@ -219,12 +250,23 @@
             bpDatabase = data.bpDatabase;
             bootRoutes = data.bootRoutes || {};
             patchInfo = data.patch || {};
+            ownChampionProfiles = data.ownChampionProfiles || {};
+            activeItemProfiles = data.activeItemProfiles || {};
+            equipmentCatalog = data.equipmentCatalog || {};
             document.getElementById('patchVersion').textContent = patchInfo.version || '7.2a';
             
             const heroCount = Object.keys(bpDatabase).length;
             emptyStateText.textContent = `等待 BP 指令输入... (已载入 ${heroCount} 名上单数据)`;
             searchInput.placeholder = "对面选了什么？(例如：奥恩、腕豪、剑姬)...";
             searchInput.disabled = false;
+            ownChampionSelect.innerHTML = '<option value="">选择我方上单（推荐）</option>' +
+                Object.keys(bpDatabase).sort((a, b) => a.localeCompare(b, 'zh-CN'))
+                    .map(name => `<option value="${name}">${name}</option>`).join('');
+            ownChampionSelect.disabled = false;
+            ownChampionSelect.addEventListener('change', () => {
+                if (currentEnemy) renderHero(currentEnemy.name, currentEnemy.data);
+            });
+            renderEquipmentLibrary();
             
             searchInput.addEventListener('input', handleSearch);
 
@@ -251,13 +293,48 @@
         return Array.from(itemsMap, ([name, iconUrl]) => ({ name, iconUrl })).slice(0, 5); 
     }
 
-    function selectBootRoute(tags) {
+    function selectDefensiveBootRoute(tags) {
         if (tags.includes('魔法消耗') || tags.includes('AP坦克')) return bootRoutes.magic;
         if (tags.includes('平A依赖') || tags.includes('暴击怪') || tags.includes('物理爆发')) return bootRoutes.physical;
         return bootRoutes.sustain;
     }
 
+    function renderBootCard(boot, label) {
+        if (!boot) return '';
+        return `<div class="border border-[#0397ab]/30 bg-[#0a1428]/50 p-3 rounded">
+            <div class="text-xs text-[#785a28] mb-2">${label}</div>
+            <div class="flex flex-wrap items-center gap-2 text-sm">
+                <span class="px-2.5 py-1 border border-[#0397ab]/40 text-[#a0e8f5] rounded">${boot.level2}</span>
+                <span class="text-[#785a28]">→ 10:00 →</span>
+                <span class="px-2.5 py-1 border border-[#c89b3c]/50 text-[#f0e6d2] rounded">${boot.level3}</span>
+            </div>
+            <div class="text-[#c8aa6e] text-sm leading-relaxed mt-2">${boot.reason}</div>
+            <div class="text-[#785a28] text-xs mt-1">${boot.timing}</div>
+        </div>`;
+    }
+
+    function renderEquipmentLibrary() {
+        document.getElementById('allBoots').innerHTML = (equipmentCatalog.boots || []).map(boot => `
+            <div class="bg-[#010a13]/60 border border-[#0a1428] p-3 text-sm">
+                <div class="text-[#f0e6d2] font-bold">${boot.level2} <span class="text-[#785a28]">→</span> ${boot.level3}</div>
+                <div class="text-[#785a28] mt-1">${boot.role}</div>
+            </div>`).join('');
+        document.getElementById('allActiveItems').innerHTML = (equipmentCatalog.activeItems || []).map(item => `
+            <div class="bg-[#010a13]/60 border border-[#0a1428] p-3 text-sm">
+                <div class="text-[#f0e6d2] font-bold">${item.name}</div>
+                <div class="text-[#0397ab] text-xs mt-1">${item.class}</div>
+                <div class="text-[#c8aa6e] mt-1">${item.purpose}</div>
+            </div>`).join('');
+        document.getElementById('allMageItems').innerHTML = (equipmentCatalog.newMageItems || []).map(item => `
+            <div class="bg-[#010a13]/60 border border-[#0a1428] p-3 text-sm">
+                <div class="text-[#f0e6d2] font-bold">${item.name}</div>
+                <div class="text-[#0397ab] text-xs mt-1">${item.type}</div>
+                <div class="text-[#c8aa6e] mt-1">${item.purpose}</div>
+            </div>`).join('');
+    }
+
     function renderHero(name, data) {
+        currentEnemy = { name, data };
         suggestionsPanel.classList.add('hidden');
         emptyState.classList.add('hidden');
         resultPanel.classList.remove('hidden');
@@ -279,16 +356,22 @@
             </div>
         `).join('');
 
-        const boot = selectBootRoute(data.tags);
-        document.getElementById('bootRoute').innerHTML = boot ? `
-            <div class="flex flex-wrap items-center gap-2 text-sm">
-                <span class="px-2.5 py-1 border border-[#0397ab]/40 text-[#a0e8f5] rounded">${boot.level2}</span>
-                <span class="text-[#785a28]">→ 10:00 后 →</span>
-                <span class="px-2.5 py-1 border border-[#c89b3c]/50 text-[#f0e6d2] rounded">${boot.level3}</span>
-            </div>
-            <div class="text-[#c8aa6e] text-sm leading-relaxed">${boot.reason}</div>
-            <div class="text-[#785a28] text-xs">${boot.timing}</div>
-        ` : '<div class="text-[#785a28] text-sm">根据己方英雄职业与对局威胁选择鞋子。</div>';
+        const defensiveBoot = selectDefensiveBootRoute(data.tags);
+        const ownName = ownChampionSelect.value;
+        const ownProfile = ownChampionProfiles[ownName];
+        const carryBoot = ownProfile ? bootRoutes[ownProfile.boot] : null;
+        const isSameRoute = carryBoot && defensiveBoot && carryBoot.level3 === defensiveBoot.level3;
+        document.getElementById('bootRoute').innerHTML =
+            renderBootCard(defensiveBoot, '对线抗压首选') +
+            (!isSameRoute && carryBoot ? renderBootCard(carryBoot, `${ownName} 发育/优势路线`) : '') +
+            (!ownName ? '<div class="text-[#785a28] text-xs">选择己方英雄后，会同时显示英雄专属的输出/功能鞋路线。</div>' : '');
+
+        const activeNames = ownProfile ? (activeItemProfiles[ownProfile.class] || []) : [];
+        document.getElementById('activeRecommendation').innerHTML = ownProfile ?
+            `<div class="text-[#785a28] mb-2">${ownName}（${ownProfile.class}）可购买：</div>` +
+            activeNames.map(item => `<span class="inline-block mr-2 mb-2 px-3 py-1.5 rounded border border-[#c89b3c]/40 text-[#f0e6d2]">${item}</span>`).join('') +
+            '<div class="text-[#785a28] text-xs mt-1">7.2 后主动装备按职业开放，商店内若显示不可购买，以游戏内职业判定为准。</div>' :
+            '<div class="text-[#785a28]">选择己方英雄后显示可用主动装备。</div>';
 
         document.getElementById('tipsList').innerHTML = data.tips.map(tip => `<li>${tip}</li>`).join('');
     }
